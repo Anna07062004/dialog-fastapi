@@ -14,9 +14,9 @@ class Settings:
     jwt_secret_key: str
     jwt_expire_minutes: str
     cookie_secure: bool
-    pozia_api_key: str
-    pozia_api_base_url:str
-    pozia_timeount_seconds: str
+    polza_api_key: str
+    polza_api_base_url:str
+    polza_timeount_seconds: str
     max_chat_history_messages: int
 
     @classmethod
@@ -24,7 +24,7 @@ class Settings:
         load_dotenv()
         settings = cls(
             app_name=os.getenv("APP_NAME", "Dialog"),
-            frontend_url=os.getenv("FRONTEND_UR", "http://localhost:5500"),
+            frontend_url=os.getenv("FRONTEND_URL", "http://localhost:5500"),
             database_url=os.getenv("DATABASE_URL", "sqlite:///data/dialog.db"),
             jwt_secret_key=os.getenv("JWT_SECRET_KEY", DEFAULT_SECRET),
             jwt_expire_minutes=int(os.getenv("JWT_EXPIRE_MINUTES", 60)),
@@ -33,7 +33,7 @@ class Settings:
             polza_api_base_url=os.getenv("POLZA_API_BASE_URL","https:/polza.api/api/v1").rstrip("/"),
             polza_timeount_seconds=int(os.getenv("POLZA_TIMEOUT_SECOUNDS", 120)),
             max_chat_history_messages=int(os.getenv("MAX_CHAT_HISTORY_MESSAGES", 40))
-)
+        )
         
         if len(settings.jwt_secret_key) < 32:
             raise ValueError("JWT_SECRET_KEY должен содержать не менее 32 символов")
