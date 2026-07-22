@@ -1,4 +1,4 @@
-const API_URL = "http://localhost:8001";
+const API_URL = "http://localhost:8000";
 
 async function api(path, options={}, redirectOnUnathorization = true) {
     const headers = new Headers(options.headers || {});
