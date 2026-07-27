@@ -50,12 +50,12 @@ class User(Base):
 class Chat(Base):
     __tablename__ = "chats"
     __table_args__= (
-        Index("idx_chats_users_updated", "user_id", "updated_at"),
+        Index("idx_chats_user_updated", "user_id", "updated_at"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     user_id: Mapped[int] = mapped_column(
-        ForeignKey("user.id", ondelete="CASCADE")
+        ForeignKey("users.id", ondelete="CASCADE")
     )
     title: Mapped[str] = mapped_column(String(120), default="Новый чат")
     created_at: Mapped[datetime] = mapped_column(
@@ -79,12 +79,12 @@ class Message(Base):
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    chat_id: Mapped[int] = mapped_column(ForeignKey("chat.id", ondelete="CASCADE"))
+    chat_id: Mapped[int] = mapped_column(ForeignKey("chats.id", ondelete="CASCADE"))
     role: Mapped[str] = mapped_column(String(20))
     content: Mapped[str] = mapped_column(Text)
     model: Mapped[str | None] = mapped_column(String(255))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
-    chat: Mapped["Chat"] = relationship(back_populates="message")
+    chat: Mapped["Chat"] = relationship(back_populates="messages")
 
 if settings.database_url.startswith("sqlite:///"):
     Path(settings.database_url.removeprefix("sqlite:///")).parent.mkdir(
