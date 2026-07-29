@@ -39,7 +39,7 @@ class User(Base):
     email: Mapped[str] = mapped_column(String(255, collation="NOCASE"), unique=True)
     password_hash: Mapped[str] = mapped_column(String(255))
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=datetime.now()
+        DateTime(timezone=True), default=utc_now
     ) 
 
     chats: Mapped[list["Chat"]] = relationship(

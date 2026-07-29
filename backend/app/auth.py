@@ -13,7 +13,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 
 from app.database import get_db, User
 from app.config import settings
@@ -25,16 +25,17 @@ router = APIRouter(prefix="/api/auth", tags=["auth"])
 password_hash = PasswordHash.recommended()
 DbSession = Annotated[Session, Depends(get_db)]
 
-bearer = HTTPBearer (auto_error=True)
+bearer = HTTPBearer(auto_error=True)
 JWT_ISSUER = "dialog-api"
-JWT_AUDIENCE = "dialog-wed"
+JWT_AUDIENCE = "dialog-web"
 
 def create_token(user_id: int) -> str:
-    now = datetime.now()
+    now = datetime.now(UTC)
+    print(settings.jwt_expire_minutes)
     return jwt.encode(
         {
             "sub": str(user_id),
-            "iet": now,
+            "iat": now,
             "exp": now + timedelta(minutes=settings.jwt_expire_minutes),
             "iss": JWT_ISSUER,
             "aud": JWT_AUDIENCE
@@ -52,7 +53,7 @@ def read_token(token: str) -> int | None:
             issuer=JWT_ISSUER,
             audience=JWT_AUDIENCE
         )
-    except jwt.PyJWTError:
+    except jwt.PyJWTError as e:
         return None
 
     user_id = payload.get("sub")
@@ -69,11 +70,12 @@ def set_auth_cookie(response: Response, token: str) -> None:
         path="/"
     )
 
-def get_current_user(request: Request, db: DbSession, creadentials: Annotated[HTTPAuthorizationCredentials | None, Depends(HTTPBearer)]):
-    token = creadentials.credentials if creadentials else request.cookies.get("dialog_access_token")
+def get_current_user(request: Request, db: DbSession, credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(bearer)]):
+
+    token = credentials.credentials if credentials else request.cookies.get("dialog_access_token")
     user_id = read_token(token) if token else None
     user = db.get(User, user_id) if user_id else None
-
+    print(user, user_id)
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -106,7 +108,7 @@ class RegisterRequest(BaseModel):
 
 class AuthResponse(BaseModel):
     access_token: str
-    token_type: str = "Bearer"
+    token_type: str = "bearer"
     user:UserResponse
 
 class LoginRequest(BaseModel):
@@ -118,7 +120,6 @@ class LoginRequest(BaseModel):
     response_model=AuthResponse,
     status_code=status.HTTP_201_CREATED
 )
-
 def register(payload: RegisterRequest, response: Response, db: DbSession):
     user = User(
         name=payload.name,
@@ -152,6 +153,7 @@ def login(payload:LoginRequest, response: Response, db: DbSession) -> AuthRespon
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Требуется вход"
         )
+    
     token = create_token(user.id)
     set_auth_cookie(response, token)
 
