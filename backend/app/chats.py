@@ -11,7 +11,7 @@ from app.config import settings
 from app.database import Chat, Message, get_db, utc_now
 from app.polza import PolzaError, polza
 
-router = APIRouter(prefix="api", tags=["chats"])
+router = APIRouter(prefix="/api", tags=["chats"])
 DbSession = Annotated[Session, Depends(get_db)]
 
 class ChatResponse(BaseModel):
@@ -57,7 +57,7 @@ class SendMessageRequest(BaseModel):
         value = value.strip()
 
         if not value:
-             raise ValueError("Сообщение не может быть пустым")
+            raise ValueError("Сообщение не может быть пустым")
 
         return value
 
@@ -87,17 +87,22 @@ async def list_models() -> list[dict[str, str]]:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail=str(exc)
-        )
 
+        )
 @router.get("/chats", response_model=list[ChatResponse])
 async def list_chats(user: CurrentUser, db: DbSession):
-    db.scalar(
-        select(Chat)
-        .where(Chat.user_id == user.id)
-        .order_by(Chat.updated_at.desc())
-    )
+    return list(
+        db.scalar(
+            select (Chat)
+                .where(Chat.user_id == user.id)
+                .order_by(Chat.updated_at.desc())))
 
-@router.post("/chats", response_model=ChatResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/chats",
+    response_model=ChatResponse,
+    status_code=status.HTTP_201_CREATED
+)
+
 def create_chat(
     payload: CreateChatRequest,
     user: CurrentUser,
@@ -108,25 +113,35 @@ def create_chat(
     db.commit()
     return chat
 
+
 @router.get("/chats/{chat_id}", response_model=ChatDetail)
-def get_chat(chat_id: int, user: CurrentUser, db: DbSession):
+def get_chat(chat_id: int, user: CurrentUser, db: DbSession) -> ChatDetail:
     chat = required_chat(chat_id, user.id, db)
     messages = list(
-        select(Message)
-        .where(Message.chat_id == chat.id)
-        .order_by(Message.created_at)
+        db.scalar(
+            select(Message)
+            .where(Message.chat_id == chat.id)
+            .order_by(Message.created_at)
+        )
     )
     return ChatDetail(chat=chat, messages=messages)
 
-@router.delete("/chats/{chat_id}/messeges", response_model=SendMessageRequest)
-async def send_messege(
+@router.delete("/chats/{chat_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_chat(chat_id: int, user: CurrentUser, db: DbSession):
+    chat = required_chat(chat_id, user.id, db)
+    db.delete(chat)
+    db.commit()
+
+@router.post("/chats/{chat_id}/messages", response_model=SendMessageResponse)
+async def send_message(
     chat_id: int,
     payload: SendMessageRequest,
+    user: CurrentUser,
     db: DbSession
-) -> SendMessageRequest:
+) -> SendMessageResponse:
     chat = required_chat(chat_id, user.id, db)
     recent = list(
-        db.scalars(
+        db.scalar(
             select(Message)
             .where(Message.chat_id == chat.id)
             .order_by(Message.created_at)
@@ -139,9 +154,9 @@ async def send_messege(
         for message in reversed(recent)
     ]
 
-    history.append({ "role": "user", "content": payload.content})
+    history.append({"role": "user", "content": payload.content})
 
-    try: 
+    try:
         reply = await polza.complete(payload.model_id, history)
     except PolzaError as exc:
         raise HTTPException(
@@ -154,14 +169,14 @@ async def send_messege(
         role="user",
         content=payload.content,
         model_id=payload.model_id
-    )
+    ) 
 
     assistant_message = Message(
-        chat_id=chat.id,
-        role="assistant",
-        content=payload.content,
-        model_id=payload.model_id
-    )
+            chat_id=chat.id,
+            role="assistant",
+            content=reply,
+            model_id=payload.model_id
+        ) 
 
     if chat.title == "Новый чат":
         chat.title = payload.content[:60] + ("..." if len(payload.content) > 60 else "")
@@ -170,4 +185,4 @@ async def send_messege(
     db.add_all((user_message, assistant_message))
     db.commit()
 
-    return SendMessageRequest(chat=chat, assistant_message=assistant_message)
+    return SendMessageResponse(chat=chat, assistant_message=assistant_message)
