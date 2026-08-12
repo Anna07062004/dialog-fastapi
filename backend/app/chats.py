@@ -92,7 +92,7 @@ async def list_models() -> list[dict[str, str]]:
 @router.get("/chats", response_model=list[ChatResponse])
 async def list_chats(user: CurrentUser, db: DbSession):
     return list(
-        db.scalar(
+        db.scalars(
             select (Chat)
                 .where(Chat.user_id == user.id)
                 .order_by(Chat.updated_at.desc())))
