@@ -18,7 +18,6 @@ from sqlalchemy.orm import (
     sessionmaker
 )
 
-
 from datetime import datetime, UTC
 from pathlib import Path
 from app.config import settings
@@ -28,28 +27,33 @@ import sqlite3
 def utc_now() -> datetime:
     return datetime.now(UTC)
 
+
 class Base(DeclarativeBase):
     pass
 
 class User(Base):
-    __tablename__ = "users"
+    __tablename__="users"
 
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(80))
-    email: Mapped[str] = mapped_column(String(255, collation="NOCASE"), unique=True)
+    email: Mapped[str] = mapped_column(
+        String(255, collation="NOCASE"),
+        unique=True
+    )
+
     password_hash: Mapped[str] = mapped_column(String(255))
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=utc_now
-    ) 
+        DateTime(timezone=True), default=datetime.now()
+    )
 
     chats: Mapped[list["Chat"]] = relationship(
         back_populates="user",
-            cascade="all, delete-orphan"
+            cascade="all, delete-orphan"    
     )
 
 class Chat(Base):
     __tablename__ = "chats"
-    __table_args__= (
+    __table_args__ = (
         Index("idx_chats_user_updated", "user_id", "updated_at"),
     )
 
@@ -64,6 +68,7 @@ class Chat(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utc_now, onupdate=utc_now
     )
+
     user: Mapped["User"] = relationship(back_populates="chats")
     messages: Mapped[list["Message"]] = relationship(
         back_populates="chat",
@@ -72,17 +77,17 @@ class Chat(Base):
     )
 
 class Message(Base):
-    __tablename__ = "message"
-    __table_args__= (
+    __tablename__ = "messages"
+    __table_args__ = (
         CheckConstraint("role IN ('user', 'assistant')"),
-        Index("idx_message_chat_created", "chat_id", "created_at")
+        Index("idx_messages_chat_created", "chat_id", "created_at")
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     chat_id: Mapped[int] = mapped_column(ForeignKey("chats.id", ondelete="CASCADE"))
     role: Mapped[str] = mapped_column(String(20))
     content: Mapped[str] = mapped_column(Text)
-    model: Mapped[str | None] = mapped_column(String(255))
+    model_id: Mapped[str | None] = mapped_column(String(255))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
     chat: Mapped["Chat"] = relationship(back_populates="messages")
 
